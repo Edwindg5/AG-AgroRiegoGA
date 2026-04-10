@@ -1,0 +1,270 @@
+<!--resultados.html-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroRiegoGA — Resultados</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="/"><div class="logo-dot"></div>AgroRiegoGA</a>
+  <ul>
+    <li><a href="/">Configurar</a></li>
+    <li><a href="/resultados">Resultados</a></li>
+    <li><a href="/calendario">Calendario</a></li>
+  </ul>
+</nav>
+
+<div class="wrap">
+  <h1 class="titulo">Resultados del <span>AG</span></h1>
+
+  <div id="sin" style="display:none; text-align:center; padding:3rem 0;">
+    <p style="color:var(--dim);">Aún no hay resultados. Ejecuta el AG primero.</p>
+    <a href="/" class="btn btn-p" style="margin-top:1.2rem;">← Configurar y Ejecutar</a>
+  </div>
+
+  <div id="con">
+    <div class="stats" id="stats"></div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+      <div class="card">
+        <div class="card-label">// Evolución por generación</div>
+        <h2>Aptitud del AG</h2>
+        <canvas id="chart-apt" height="200"></canvas>
+        <div style="display:flex; gap:1rem; margin-top:.8rem; font-size:.67rem;">
+          <span style="color:var(--verde)">● Mejor</span>
+          <span style="color:var(--amarillo)">● Promedio</span>
+          <span style="color:var(--rojo)">● Peor</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">// Variables optimizadas</div>
+        <h2>Evolución de Variables</h2>
+        <canvas id="chart-vars" height="200"></canvas>
+        <div style="display:flex; gap:1rem; margin-top:.8rem; font-size:.67rem;">
+          <span style="color:var(--verde)">● Cobertura %</span>
+          <span style="color:var(--amarillo)">● Equidad σ</span>
+          <span style="color:var(--rojo)">● Déficit norm.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:.8rem;">
+        <div>
+          <div class="card-label">// Mejores soluciones</div>
+          <h2 style="margin:0;">Top 3 Individuos</h2>
+        </div>
+        <button class="btn btn-g" onclick="exportCSV('t3','top3_AgroRiegoGA.csv')">↓ CSV</button>
+      </div>
+      <div class="tw">
+        <table id="t3">
+          <thead>
+            <tr>
+              <th>#</th><th>Aptitud</th><th>Cobertura prom.</th>
+              <th>Déficit total L</th><th>Equidad σ</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-t3"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:.8rem;">
+        <div>
+          <div class="card-label">// Mejor individuo</div>
+          <h2 style="margin:0;">Programación Semanal de Riego</h2>
+        </div>
+        <div style="display:flex; gap:.8rem; flex-wrap:wrap;">
+          <button class="btn btn-g" onclick="exportCSV('tprog','programacion_AgroRiegoGA.csv')">↓ CSV</button>
+          <a href="/calendario" class="btn btn-o">Ver Calendario →</a>
+        </div>
+      </div>
+      <div class="tw">
+        <table id="tprog">
+          <thead>
+            <tr>
+              <th>Parcela</th><th>Días</th><th>Hora inicio</th>
+              <th>Duración min</th><th>Litros aplic.</th>
+              <th>Litros requ.</th><th>Cobertura</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-prog"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">// Comparativa</div>
+      <h2>AG vs Programación Manual</h2>
+      <p style="color:var(--dim); font-size:.76rem; margin-bottom:1.2rem;">
+        La referencia manual riega cada parcela 2 horas diarias todos los días sin distinción de cultivo ni etapa.
+      </p>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1rem;" id="comparativa"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <strong>AgroRiegoGA</strong>
+  <span>233282 · Díaz García Edwin de Jesús · 8B · UPChiapas 2026</span>
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+const MEDALLAS = ['🥇','🥈','🥉'];
+
+function optsChart(etiquetaY) {
+  return {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        ticks: { color: '#5a8a68', font: { family: 'Space Mono', size: 10 }, maxTicksLimit: 8 },
+        grid:  { color: 'rgba(30,51,35,.5)' }
+      },
+      y: {
+        ticks: { color: '#5a8a68', font: { family: 'Space Mono', size: 10 } },
+        grid:  { color: 'rgba(30,51,35,.5)' },
+        title: { display: true, text: etiquetaY, color: '#5a8a68', font: { size: 10 } }
+      }
+    }
+  };
+}
+
+function renderResultados(data) {
+  const mejor = data.top3[0];
+
+  // Stats
+  const statsEl = document.getElementById('stats');
+  [
+    { val: fmt(mejor.aptitud, 4),        lbl: 'Aptitud mejor' },
+    { val: pct(mejor.cobertura_prom),    lbl: 'Cobertura hídrica' },
+    { val: fmt(mejor.deficit_total, 0) + ' L', lbl: 'Déficit total' },
+    { val: fmt(mejor.equidad, 3),        lbl: 'Equidad σ' },
+  ].forEach(s => {
+    statsEl.innerHTML += `<div class="stat"><div class="sv">${s.val}</div><div class="sl">${s.lbl}</div></div>`;
+  });
+
+  // Chart aptitud
+  const labels = data.historico.map((_, i) => i + 1);
+  new Chart(document.getElementById('chart-apt'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { data: data.historico.map(h => h.mejor),   borderColor: 'rgb(45,255,143)',  backgroundColor: 'rgba(45,255,143,.07)', borderWidth: 2, pointRadius: 0, tension: .4, fill: true },
+        { data: data.historico.map(h => h.promedio), borderColor: 'rgb(245,230,66)', borderWidth: 1.5, pointRadius: 0, tension: .4, borderDash: [4,3] },
+        { data: data.historico.map(h => h.peor),     borderColor: 'rgb(255,77,77)',  borderWidth: 1,   pointRadius: 0, tension: .4, borderDash: [2,4] },
+      ]
+    },
+    options: optsChart('Aptitud')
+  });
+
+  // Chart variables
+  new Chart(document.getElementById('chart-vars'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { data: data.historico.map(h => h.cobertura),    borderColor: 'rgb(45,255,143)', borderWidth: 2,   pointRadius: 0, tension: .4 },
+        { data: data.historico.map(h => h.equidad),      borderColor: 'rgb(245,230,66)', borderWidth: 1.5, pointRadius: 0, tension: .4 },
+        { data: data.historico.map(h => h.deficit_norm), borderColor: 'rgb(255,77,77)',  borderWidth: 1.5, pointRadius: 0, tension: .4 },
+      ]
+    },
+    options: optsChart('Valor')
+  });
+
+  // Top 3
+  const tbody3 = document.getElementById('tbody-t3');
+  data.top3.forEach((ind, i) => {
+    tbody3.innerHTML += `
+      <tr>
+        <td>${MEDALLAS[i]}</td>
+        <td><strong style="color:${colorApt(ind.aptitud)}">${fmt(ind.aptitud, 4)}</strong></td>
+        <td>${pct(ind.cobertura_prom)}</td>
+        <td>${fmt(ind.deficit_total, 1)}</td>
+        <td>${fmt(ind.equidad, 3)}</td>
+      </tr>`;
+  });
+
+  // Programación
+  const tbodyP = document.getElementById('tbody-prog');
+  mejor.programacion.forEach(row => {
+    const c  = parseFloat(row.cobertura);
+    const cl = c >= 80 ? 'var(--verde)' : c >= 50 ? 'var(--amarillo)' : 'var(--rojo)';
+    const diasStr = Array.isArray(row.dias) ? row.dias.join(', ') : row.dias;
+    tbodyP.innerHTML += `
+      <tr>
+        <td><strong style="color:var(--verde)">${row.parcela}</strong></td>
+        <td style="font-size:.71rem">${diasStr}</td>
+        <td>${horaFmt(row.hora_inicio)}</td>
+        <td>${row.duracion}</td>
+        <td>${fmt(row.litros_aplicados, 1)}</td>
+        <td>${fmt(row.litros_requeridos, 1)}</td>
+        <td><strong style="color:${cl}">${pct(c)}</strong></td>
+      </tr>`;
+  });
+
+  // Comparativa
+  const comp  = data.comparativa;
+  const compEl = document.getElementById('comparativa');
+  [
+    {
+      titulo: 'Litros totales',
+      ag:     fmt(comp.ag_litros, 0) + ' L',
+      manual: fmt(comp.manual_litros, 0) + ' L',
+      ahorro: fmt(comp.ahorro_litros, 0) + ' L ahorrados',
+      mejor:  comp.ahorro_litros > 0
+    },
+    {
+      titulo: 'Cobertura prom.',
+      ag:     pct(comp.ag_cobertura),
+      manual: pct(comp.manual_cobertura),
+      ahorro: '+' + pct(comp.ag_cobertura - comp.manual_cobertura) + ' mejora',
+      mejor:  comp.ag_cobertura > comp.manual_cobertura
+    },
+    {
+      titulo: 'Equidad σ',
+      ag:     fmt(comp.ag_equidad, 3),
+      manual: fmt(comp.manual_equidad, 3),
+      ahorro: fmt(comp.manual_equidad - comp.ag_equidad, 3) + ' σ reducción',
+      mejor:  comp.ag_equidad < comp.manual_equidad
+    }
+  ].forEach(it => {
+    const col = it.mejor ? 'var(--verde)' : 'var(--rojo)';
+    compEl.innerHTML += `
+      <div style="background:rgba(45,255,143,.03); border:1px solid var(--borde); border-radius:4px; padding:1.1rem;">
+        <div style="font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:.7rem;">${it.titulo}</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin-bottom:.7rem;">
+          <div>
+            <div style="font-size:.61rem;color:var(--verde);margin-bottom:.2rem;">AG</div>
+            <div style="font-size:1rem;font-weight:700;color:var(--verde)">${it.ag}</div>
+          </div>
+          <div>
+            <div style="font-size:.61rem;color:var(--dim);margin-bottom:.2rem;">Manual</div>
+            <div style="font-size:1rem;font-weight:700;color:var(--dim)">${it.manual}</div>
+          </div>
+        </div>
+        <div style="font-size:.72rem; color:${col}; border-top:1px solid var(--borde); padding-top:.6rem;">
+          ${it.mejor ? '↑' : '↓'} ${it.ahorro}
+        </div>
+      </div>`;
+  });
+}
+
+fetch('/api/resultados')
+  .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+  .then(renderResultados)
+  .catch(() => {
+    document.getElementById('sin').style.display = 'block';
+    document.getElementById('con').style.display = 'none';
+  });
+</script>
+</body>
+</html>

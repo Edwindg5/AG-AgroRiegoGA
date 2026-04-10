@@ -1,0 +1,214 @@
+<!--index.html-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroRiegoGA — Configurar</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="/"><div class="logo-dot"></div>AgroRiegoGA</a>
+  <ul>
+    <li><a href="/">Configurar</a></li>
+    <li><a href="/resultados">Resultados</a></li>
+    <li><a href="/calendario">Calendario</a></li>
+  </ul>
+</nav>
+
+<div class="wrap">
+  <h1 class="titulo">Optimización de <span>Riego</span></h1>
+
+  <div style="display:grid; grid-template-columns:1fr 1.25fr; gap:1.5rem; align-items:start;">
+
+    <div class="card">
+      <div class="card-label">// Parámetros del AG</div>
+      <h2>Configurar Algoritmo Genético</h2>
+
+      <form id="form-ag">
+        <div class="form-grid">
+          <div class="fg">
+            <label for="npob">Tamaño de población</label>
+            <input type="number" id="npob" name="npob" value="50" min="10" max="500" required />
+          </div>
+          <div class="fg">
+            <label for="ngen">Generaciones</label>
+            <input type="number" id="ngen" name="ngen" value="100" min="10" max="1000" required />
+          </div>
+          <div class="fg full">
+            <label for="pc">Probabilidad de cruza (Pc)</label>
+            <div class="rw">
+              <input type="range" id="pc" name="pc" min="0.50" max="1.0" step="0.01" value="0.85" data-pct="1" />
+              <span class="rv">85%</span>
+            </div>
+          </div>
+          <div class="fg full">
+            <label for="pm">Probabilidad de mutación individuo (Pm)</label>
+            <div class="rw">
+              <input type="range" id="pm" name="pm" min="0.001" max="0.10" step="0.001" value="0.01" data-pct="1" />
+              <span class="rv">1%</span>
+            </div>
+          </div>
+          <div class="fg full">
+            <label for="pmg">Probabilidad de mutación por gen (Pmg)</label>
+            <div class="rw">
+              <input type="range" id="pmg" name="pmg" min="0.001" max="0.50" step="0.001" value="0.05" data-pct="1" />
+              <span class="rv">5%</span>
+            </div>
+          </div>
+          <div class="fg">
+            <label for="elites">Élites a conservar</label>
+            <input type="number" id="elites" name="elites" value="5" min="1" max="20" required />
+          </div>
+          <div class="fg">
+            <label for="semilla">Semilla aleatoria</label>
+            <input type="number" id="semilla" name="semilla" value="42" min="0" max="9999" />
+          </div>
+        </div>
+
+        <div style="display:flex; gap:.8rem; margin-top:1.4rem; flex-wrap:wrap;">
+          <button type="submit" class="btn btn-p" id="btn-ej">
+            <div class="spin"></div>
+            <span class="btxt">▶ Ejecutar AG</span>
+          </button>
+          <button type="button" class="btn btn-g" id="btn-reset">Restablecer</button>
+        </div>
+
+        <div class="prog" id="prog">
+          <div class="prog-info">
+            <span id="prog-txt">Inicializando...</span>
+            <span id="prog-pct">0%</span>
+          </div>
+          <div class="prog-barra"><div class="prog-fill" id="prog-fill"></div></div>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-label">// Base de conocimiento</div>
+      <h2>Parcelas registradas</h2>
+      <div class="tw">
+        <table id="tabla-parcelas">
+          <thead>
+            <tr>
+              <th>ID</th><th>Área m²</th><th>Suelo</th>
+              <th>Cultivo</th><th>Etapa</th><th>Caudal L/h</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-parcelas">
+            <tr><td colspan="6" style="text-align:center;color:var(--dim);">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <strong>AgroRiegoGA</strong>
+  <span>233282 · Díaz García Edwin de Jesús · 8B · UPChiapas 2026</span>
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+fetch('/api/parcelas')
+  .then(r => r.json())
+  .then(data => {
+    const tbody = document.getElementById('tbody-parcelas');
+    tbody.innerHTML = '';
+    data.forEach(p => {
+      tbody.innerHTML += `
+        <tr>
+          <td><strong style="color:var(--verde)">${p.id}</strong></td>
+          <td>${p.area}</td>
+          <td>${p.suelo}</td>
+          <td>${p.cultivo}</td>
+          <td>${p.etapa}</td>
+          <td>${p.caudal}</td>
+        </tr>`;
+    });
+  })
+  .catch(() => {
+    document.getElementById('tbody-parcelas').innerHTML =
+      '<tr><td colspan="6" style="color:var(--rojo);text-align:center;">Error al cargar parcelas</td></tr>';
+  });
+
+const form  = document.getElementById('form-ag');
+const btnEj = document.getElementById('btn-ej');
+const prog  = document.getElementById('prog');
+const fill  = document.getElementById('prog-fill');
+const ptxt  = document.getElementById('prog-txt');
+const ppct  = document.getElementById('prog-pct');
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const params = {
+    npob:    parseInt(form.npob.value),
+    ngen:    parseInt(form.ngen.value),
+    pc:      parseFloat(form.pc.value),
+    pm:      parseFloat(form.pm.value),
+    pmg:     parseFloat(form.pmg.value),
+    elites:  parseInt(form.elites.value),
+    semilla: parseInt(form.semilla.value),
+  };
+
+  if (params.elites >= params.npob) {
+    toast('Élites debe ser menor que la población', 'error');
+    return;
+  }
+
+  btnEj.classList.add('cargando');
+  btnEj.disabled = true;
+  prog.classList.add('vis');
+
+  let gen = 0;
+  const intervalo = setInterval(() => {
+    gen = Math.min(gen + Math.random() * 2, params.ngen * 0.88);
+    const p = Math.round((gen / params.ngen) * 100);
+    fill.style.width = p + '%';
+    ppct.textContent = p + '%';
+    ptxt.textContent = 'Generación ' + Math.round(gen) + ' / ' + params.ngen;
+  }, 200);
+
+  try {
+    const res = await fetch('/ejecutar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    clearInterval(intervalo);
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Error en el servidor');
+    }
+
+    fill.style.width = '100%';
+    ppct.textContent = '100%';
+    ptxt.textContent = 'Completado';
+    toast('AG finalizado, redirigiendo...');
+    setTimeout(() => window.location.href = '/resultados', 1000);
+
+  } catch (err) {
+    clearInterval(intervalo);
+    toast(err.message, 'error');
+    btnEj.classList.remove('cargando');
+    btnEj.disabled = false;
+    prog.classList.remove('vis');
+  }
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  form.reset();
+  initSliders();
+  prog.classList.remove('vis');
+  fill.style.width = '0%';
+  toast('Parámetros restablecidos');
+});
+</script>
+</body>
+</html>

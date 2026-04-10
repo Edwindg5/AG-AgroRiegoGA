@@ -1,0 +1,171 @@
+<!--calendario.html-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroRiegoGA — Calendario</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="/"><div class="logo-dot"></div>AgroRiegoGA</a>
+  <ul>
+    <li><a href="/">Configurar</a></li>
+    <li><a href="/resultados">Resultados</a></li>
+    <li><a href="/calendario">Calendario</a></li>
+  </ul>
+</nav>
+
+<div class="wrap">
+  <h1 class="titulo">Calendario <span>Semanal</span></h1>
+
+  <div id="sin" style="display:none; text-align:center; padding:3rem 0;">
+    <p style="color:var(--dim);">No hay programación disponible. Ejecuta el AG primero.</p>
+    <a href="/" class="btn btn-p" style="margin-top:1.2rem;">← Ejecutar AG</a>
+  </div>
+
+  <div id="con">
+    <div style="display:flex; gap:1.5rem; margin-bottom:1.4rem; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:.45rem; font-size:.71rem; color:var(--dim);">
+        <div style="width:11px;height:11px;background:rgba(45,255,143,.4);border-radius:2px;"></div> Óptimo ≥80%
+      </div>
+      <div style="display:flex; align-items:center; gap:.45rem; font-size:.71rem; color:var(--dim);">
+        <div style="width:11px;height:11px;background:rgba(245,230,66,.4);border-radius:2px;"></div> Regular 50–79%
+      </div>
+      <div style="display:flex; align-items:center; gap:.45rem; font-size:.71rem; color:var(--dim);">
+        <div style="width:11px;height:11px;background:rgba(255,77,77,.35);border-radius:2px;"></div> Bajo &lt;50%
+      </div>
+      <div style="display:flex; align-items:center; gap:.45rem; font-size:.71rem; color:var(--dim);">
+        <div style="width:11px;height:11px;background:var(--input);border:1px solid var(--borde);border-radius:2px;"></div> Sin riego
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem; overflow-x:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.1rem; flex-wrap:wrap; gap:.8rem;">
+        <div>
+          <div class="card-label">// Mejor individuo · Semana completa</div>
+          <h2 style="margin:0;">Parcelas × Días</h2>
+        </div>
+        <button class="btn btn-g" onclick="exportarCal()">↓ CSV</button>
+      </div>
+      <div id="grilla" style="min-width:640px;"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-label">// Cobertura por parcela</div>
+      <h2>Distribución de Cobertura Hídrica</h2>
+      <div id="barras" style="display:flex; flex-direction:column; gap:.7rem; margin-top:.5rem;"></div>
+    </div>
+
+    <div style="text-align:center;">
+      <a href="/resultados" class="btn btn-o">← Ver Resultados Completos</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <strong>AgroRiegoGA</strong>
+  <span>233282 · Díaz García Edwin de Jesús · 8B · UPChiapas 2026</span>
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+const DIAS = ['lun','mar','mie','jue','vie','sab','dom'];
+const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+let _prog = [];
+
+function renderCalendario(prog) {
+  _prog = prog;
+
+  const mapa = {};
+  prog.forEach(r => {
+    const diasSet = new Set(Array.isArray(r.dias) ? r.dias : []);
+    mapa[r.parcela] = {
+      dias:              diasSet,
+      hora:              r.hora_inicio,
+      duracion:          r.duracion,
+      litros_aplicados:  r.litros_aplicados,
+      litros_requeridos: r.litros_requeridos,
+      cobertura:         parseFloat(r.cobertura)
+    };
+  });
+
+  const grilla   = document.getElementById('grilla');
+  const parcelas = Object.keys(mapa).sort();
+
+  let html = `<div style="display:grid; grid-template-columns:90px repeat(7,1fr); gap:3px; margin-bottom:3px;">
+    <div></div>`;
+  DIAS_LABEL.forEach(d => {
+    html += `<div style="font-size:.63rem; letter-spacing:.1em; text-transform:uppercase; color:var(--verde); text-align:center; padding:.35rem 0;">${d}</div>`;
+  });
+  html += '</div>';
+
+  parcelas.forEach(pid => {
+    const p  = mapa[pid];
+    const bg = p.cobertura >= 80 ? 'rgba(45,255,143,.15)' : p.cobertura >= 50 ? 'rgba(245,230,66,.13)' : 'rgba(255,77,77,.12)';
+    const tc = p.cobertura >= 80 ? 'var(--verde)' : p.cobertura >= 50 ? 'var(--amarillo)' : 'var(--rojo)';
+
+    html += `<div style="display:grid; grid-template-columns:90px repeat(7,1fr); gap:3px; margin-bottom:3px; align-items:center;">
+      <div style="font-size:.77rem;"><strong style="color:var(--verde)">${pid}</strong></div>`;
+
+    DIAS.forEach(d => {
+      if (p.dias.has(d)) {
+        html += `
+          <div style="background:${bg}; border:1px solid rgba(45,255,143,.2); border-radius:3px; padding:.4rem .2rem; text-align:center;"
+               title="${pid} · ${d} · ${horaFmt(p.hora)} · ${p.duracion}min · ${pct(p.cobertura)}">
+            <div style="font-size:.62rem; color:${tc}; font-weight:700;">${horaFmt(p.hora)}</div>
+            <div style="font-size:.59rem; color:var(--dim); margin-top:.1rem;">${p.duracion}m</div>
+          </div>`;
+      } else {
+        html += `<div style="background:var(--input); border:1px solid var(--borde); border-radius:3px; height:40px;"></div>`;
+      }
+    });
+    html += '</div>';
+  });
+
+  grilla.innerHTML = html;
+
+  // Barras de cobertura
+  const barrasEl = document.getElementById('barras');
+  parcelas.forEach(pid => {
+    const p   = mapa[pid];
+    const cob = Math.min(p.cobertura, 100);
+    const col = cob >= 80 ? 'var(--verde)' : cob >= 50 ? 'var(--amarillo)' : 'var(--rojo)';
+    barrasEl.innerHTML += `
+      <div style="display:grid; grid-template-columns:60px 1fr 60px; align-items:center; gap:1rem;">
+        <div style="font-size:.79rem; color:var(--verde); font-weight:700;">${pid}</div>
+        <div style="background:var(--borde); border-radius:2px; height:6px; overflow:hidden;">
+          <div style="height:100%; width:${cob}%; background:${col}; border-radius:2px;"></div>
+        </div>
+        <div style="font-size:.77rem; color:${col}; text-align:right; font-weight:700;">${pct(p.cobertura)}</div>
+      </div>`;
+  });
+}
+
+function exportarCal() {
+  const filas = [['Parcela','Días','Hora Inicio','Duración min','Litros Aplic.','Litros Requ.','Cobertura %']];
+  _prog.forEach(r => {
+    const diasStr = Array.isArray(r.dias) ? r.dias.join(' ') : r.dias;
+    filas.push([r.parcela, diasStr, horaFmt(r.hora_inicio), r.duracion,
+                fmt(r.litros_aplicados, 1), fmt(r.litros_requeridos, 1), pct(parseFloat(r.cobertura))]);
+  });
+  const csv = filas.map(f => f.map(v => '"' + v + '"').join(',')).join('\n');
+  const a   = document.createElement('a');
+  a.href    = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'calendario_AgroRiegoGA.csv';
+  a.click();
+  toast('Calendario exportado');
+}
+
+fetch('/api/resultados')
+  .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+  .then(data => renderCalendario(data.top3[0].programacion))
+  .catch(() => {
+    document.getElementById('sin').style.display = 'block';
+    document.getElementById('con').style.display = 'none';
+  });
+</script>
+</body>
+</html>
